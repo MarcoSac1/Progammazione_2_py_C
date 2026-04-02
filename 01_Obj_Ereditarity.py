@@ -37,6 +37,7 @@ class Dottore(Persona):
         self.specializzazione = specializzazione
         self.matricola = matricola
         self.reparto = reparto
+        self.pazienti = []
     
     def __str__(self):
         base = super().__str__()
@@ -45,22 +46,52 @@ class Dottore(Persona):
 paziente = Persona("Luca", "Rossi", 33)
 anamnesi = Paziente("Luca", "Rossi", 33, "CT001", "0+", ["cervicale"], ["augmentin"])
 medico = Dottore("Luca", "Bianchi", 45, "Ospedale Garibaldi", "Andrologia", 66854, "Sala Gessi")
+medico.pazienti.append(anamnesi)
 
-print("=== Dati paziente ===")
-print(f"Nome: {paziente.nome} {paziente.cognome}")
-print(f"Età: {paziente.età} anni")
-print(f"ID paziente: {anamnesi.id_paziente}")
-print(f"Gruppo sanguigno: {anamnesi.gruppo_sanguigno}")
-print(f"Patologie: {', '.join(anamnesi.patologie)}")
-print(f"Allergie: {', '.join(anamnesi.allergie)}")
-print()
-print("=== Dottore curante ===")
-print(f"Nome: {medico.nome} {medico.cognome}")
-print(f"Età: {medico.età} anni")
-print(f"Ospedale: {medico.ospedale}")
-print(f"Specializzazione: {medico.specializzazione}")
-print(f"Matricola: {medico.matricola}")
-print(f"Reparto: {medico.reparto}")
 
-def aggiungi_paziente_patologie():
+
+def aggiungi_paziente_patologie(dottore, paziente_da_aggiungere):
+    dottore.pazienti.append(paziente_da_aggiungere)
+
+
+while True:
+    print("1. mostra la lista di pazienti \n2. Inserisci un nuovo paziente \n3. Exit")
+    scelta = int(input("seleziona un operazione da compiere: "))
     
+    if scelta == 1:
+        print("=== Dati paziente ===")
+        print(f"Nome: {paziente.nome} {paziente.cognome}")
+        print(f"Età: {paziente.età} anni")
+        print(f"ID paziente: {anamnesi.id_paziente}")
+        print(f"Gruppo sanguigno: {anamnesi.gruppo_sanguigno}")
+        print(f"Patologie: {', '.join(anamnesi.patologie)}")
+        print(f"Allergie: {', '.join(anamnesi.allergie)}")
+        print()
+        print("=== Medico Curante ===")
+        print(f"Nome: {medico.nome} {medico.cognome}")
+        print(f"Età: {medico.età} anni")
+        print(f"Ospedale: {medico.ospedale}")
+        print(f"Specializzazione: {medico.specializzazione}")
+        print(f"Matricola: {medico.matricola}")
+        print(f"Reparto: {medico.reparto}\n")  
+        print(f"=== Lista completa pazienti in cura ({len(medico.pazienti)}): ===")
+        for i, paz in enumerate(medico.pazienti, 1):
+            print(f"{i}. {paz}")
+        print()
+    elif scelta == 2:
+        nome = input("Nome: ")
+        cognome = input("Cognome: ")
+        età = int(input("Età: "))
+        id_paz = input("ID paziente: ")
+        gruppo = input("Gruppo sanguigno: ")
+        patologie = input("Patologie (separate da virgola): ").split(",")
+        allergie = input("Allergie (separate da virgola): ").split(",")
+        
+        nuovo_paz = Paziente(nome, cognome, età, id_paz, gruppo, patologie, allergie)
+        aggiungi_paziente_patologie(medico, nuovo_paz)
+        print(f"{nuovo_paz.nome} {nuovo_paz.cognome} aggiunto ai pazienti di {medico.nome}.")
+    elif scelta == 3:
+        print("Uscita.")
+        break
+    else:
+        print("Scelta non valida, riprova.")
