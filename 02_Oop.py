@@ -23,7 +23,7 @@ class Auto:
 
     # Setter con validazione
     def set_velocita(self, nuova_velocita):
-        if 0 <= nuova_velocita <= 200:  # Limiti realistici
+        if 0 <= nuova_velocita <= 400:  # Limiti realistici
             self._velocita = nuova_velocita
             print(f"Velocità impostata a {self._velocita} km/h")
         else:
@@ -35,4 +35,20 @@ mia_auto.accelera()
 mia_auto.accelera()      
 print(mia_auto.get_velocita())  
 mia_auto.set_velocita(150)  
+mia_auto.descrivi()
+
+class AutoEletrica(Auto):
+    def __init__(self, marca, modello, anno,autonomia):
+        super().__init__(marca, modello, anno)
+        self.autonomia = autonomia
+        
+    def range(self):
+        print(f"La {self.marca} ha un autonomia di {self.autonomia} km")
+        
+    def descrivi(self):
+        return super().descrivi()
+        
+mia_auto = AutoEletrica ("Tesla", "Model X Plaid", 2025, 760 )
+mia_auto.range()
+mia_auto.set_velocita(320)
 mia_auto.descrivi()
