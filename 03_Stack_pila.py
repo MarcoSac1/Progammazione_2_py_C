@@ -29,15 +29,15 @@ class Stack:
 
 
 pila = Stack()
-pila.push('Google.com')     #0 A
+pila.push('Google.com')     # A
 pila.push('Wikipedia.com') # B
-pila.push('python.org')     # C
+pila.push('python.org')    # C
 
 print(f"Pila attuale: {pila}")      # Output: ['A', 'B', 'C']
-print(f"Elemento in cima (peek): {pila.peek()}") # Output: C
+print(f"Primo elemento inserito nella lista: {pila.peek()}") # Output: C
 print(f"Pop: {pila.pop()}")         # Output: C
-print(f"Pila dopo pop: {pila}")     # Output: ['A', 'B']
-print(f"Dimensione: {pila.size()}") # Output: 2
+print(f"Pila dopo il pop: {pila}")     # Output: ['A', 'B']
+print(f"Dimensione dopo il pop: {pila.size()}") # Output: 2
 
 pila.insert(1, 'proton.me') 
 pila.insert(2, 'facebook.com') #tre elementi al centro della pila
