@@ -210,3 +210,4 @@ print("6 turni senza bob:", cl.traverse(6),"\n")
 
 # 10) Stampa quanti analisti sono nel team
 print("Numero analisti:", cl.size())
+
