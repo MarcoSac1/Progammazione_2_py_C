@@ -102,26 +102,22 @@ ll = LinkedList()
 
 print("la lista iniziale:", ll,"\n")
 
-ll.insertFirst(10)
-ll.insertFirst(20)
-ll.insertFirst(30)
-print("la lista dopo aver aggiunto tre elementi:", ll,"\n")
+ll.insertLast("admin")
+ll.insertLast("mario")
+ll.insertLast("sara")
+print("cronologia degli utenti:", ll,"\n")
 
-ll.insertBefore(20, 25)
-print("lista dopo aver inserito 25 tra 20 e 30", ll,"\n")
+ll.insertAfter("mario", "guest")
+print("lista dopo aver inserito guest dopo mario", ll,"\n")
 
-ll.insertAfter(10, 5)
-print("Inserisco 5 prima di 10", ll,"\n")
+ll.insertFirst("root")
+print("Inserisco root prima di admin", ll,"\n")
 
-ll.insertBefore(10, 15)
-print("Inserisco 15 prima di 20", ll,"\n")
+ll.insertBefore("sara", "luca")
+print("inserisco luca prima di sara", ll,"\n")
 
 ll.removeFirst()
-print("Lista con il primo elemento rimosso", ll,"\n")
+print(f"Lista con il primo elemento rimosso {ll} \n")
 
-ll.removeLast()
-print("Rimuovo l'ultimo elemento", ll,"\n")
-
-print("Nella lista sono presenti,", ll.size(), "elementi ","\n")
-
-print("Il primo elemento della lista è", ll.peekFirst())
+print("Numero di modifiche registrate:", ll.size())
+print("Modifica più recente da processare:", ll.peekFirst())
