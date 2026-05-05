@@ -1,0 +1,305 @@
+#!/usr/bin/env python3
+import os
+import textwrap
+
+class Host:
+    def __init__(self, name, lan, ip, prefix, gw):
+        self.name = name
+        self.lan = lan
+        self.ip = ip
+        self.prefix = prefix
+        self.gw = gw
+
+class RouterInterface:
+    def __init__(self, vbox_nic, lan, linux_if, ip, prefix):
+        self.vbox_nic = vbox_nic      # es. 1, 2, 3...
+        self.lan = lan                # es. lan10
+        self.linux_if = linux_if      # es. enp0s3
+        self.ip = ip                  # es. 145.18.14.1
+        self.prefix = prefix          # es. 24
+
+class Route:
+    def __init__(self, dest, via):
+        self.dest = dest              # es. 145.18.15.0/28
+        self.via = via                # es. 145.18.15.38
+
+class Router:
+    def __init__(self, name, memory=256):
+        self.name = name
+        self.memory = memory
+        self.interfaces = []          # lista di RouterInterface
+        self.routes = []              # lista di Route
+        self.enable_forwarding = True
+
+def input_int(prompt, default=None, min_val=None, max_val=None):
+    while True:
+        s = input(prompt).strip()
+        if not s and default is not None:
+            return default
+        try:
+            val = int(s)
+            if min_val is not None and val < min_val:
+                print(f"Valore minimo {min_val}")
+                continue
+            if max_val is not None and val > max_val:
+                print(f"Valore massimo {max_val}")
+                continue
+            return val
+        except ValueError:
+            print("Inserire un numero valido.")
+
+def add_host():
+    print("\n=== Aggiungi HOST ===")
+    name = input("Nome VM host (es. A): ").strip()
+    lan = input("Nome LAN VirtualBox (es. lan10): ").strip()
+    ip = input("Indirizzo IP host (es. 145.18.14.2): ").strip()
+    prefix = input_int("Prefisso (es. 24): ")
+    gw = input("Gateway (es. 145.18.14.1): ").strip()
+    return Host(name, lan, ip, prefix, gw)
+
+def add_router():
+    print("\n=== Aggiungi ROUTER ===")
+    name = input("Nome VM router (es. R1): ").strip()
+    memory = input_int("Memoria RAM (MB, default 256): ", default=256)
+    router = Router(name, memory)
+
+    # Interfacce
+    while True:
+        print("\n--- Aggiungi interfaccia al router", name, "---")
+        vbox_nic = input_int("Numero NIC VirtualBox (1-8): ", min_val=1, max_val=8)
+        lan = input("Nome LAN VirtualBox (es. lan10): ").strip()
+        linux_if = input("Nome interfaccia Linux (es. enp0s3): ").strip()
+        ip = input("Indirizzo IP interfaccia (es. 145.18.14.1): ").strip()
+        prefix = input_int("Prefisso (es. 24): ")
+
+        router.interfaces.append(RouterInterface(vbox_nic, lan, linux_if, ip, prefix))
+
+        more = input("Aggiungere un'altra interfaccia a questo router? [s/N]: ").strip().lower()
+        if more != "s":
+            break
+
+    # Rotte statiche
+    while True:
+        add_r = input("Aggiungere una rotta statica per questo router? [s/N]: ").strip().lower()
+        if add_r != "s":
+            break
+        dest = input("Destinazione (es. 145.18.15.0/28): ").strip()
+        via = input("Next-hop (es. 145.18.15.38): ").strip()
+        router.routes.append(Route(dest, via))
+
+    return router
+
+def build_gn_script(base_vm, hosts, routers, isp_name, file_prefix):
+    lines = []
+    lines.append("#!/bin/bash\n")
+    lines.append("# Topologia generata automaticamente\n\n")
+    lines.append(f"VBoxManage snapshot {base_vm} delete Snapshot\n")
+    lines.append(f"VBoxManage snapshot {base_vm} take Snapshot\n\n")
+
+    # HOST
+    for h in hosts:
+        lines.append(f"# HOST {h.name} ({h.lan})\n")
+        lines.append(f"VBoxManage clonevm {base_vm} --snapshot Snapshot --name {h.name} --options link --register\n")
+        lines.append(
+            f"VBoxManage modifyvm {h.name} --memory 256 "
+            f"--nic1 intnet --intnet1 {h.lan} --nic2 none --nic3 none --nic4 none\n\n"
+        )
+
+    # ROUTER
+    for r in routers:
+        lines.append(f"# ROUTER {r.name}\n")
+        lines.append(f"VBoxManage clonevm {base_vm} --snapshot Snapshot --name {r.name} --options link --register\n")
+
+        # Costruisco la riga modifyvm con le NIC
+        nic_parts = []
+        for iface in r.interfaces:
+            nic_parts.append(f"--nic{iface.vbox_nic} intnet --intnet{iface.vbox_nic} {iface.lan}")
+        nic_str = " \\\n" + " ".join(nic_parts) if nic_parts else ""
+        lines.append(f"VBoxManage modifyvm {r.name} --memory {r.memory} {nic_str}\n\n")
+
+    # ISP come router speciale (opzionale)
+    if isp_name:
+        lines.append(f"# ISP (trattato come router con nome {isp_name})\n")
+        lines.append(f"# Configura le sue interfacce modificando questo blocco manualmente se necessario\n\n")
+
+    # Avvio VM
+    lines.append("# Avvio VM\n")
+    for h in hosts:
+        lines.append(f"VBoxManage startvm {h.name}\n")
+    for r in routers:
+        lines.append(f"VBoxManage startvm {r.name}\n")
+    if isp_name:
+        lines.append(f"VBoxManage startvm {isp_name}\n")
+
+    return "".join(lines)
+
+def build_conf_script(hosts, routers, isp_name, isp_ifaces):
+    lines = []
+    lines.append("#!/bin/bash\n\n")
+    lines.append("# Configurazione generata automaticamente\n\n")
+
+    # HOST
+    for h in hosts:
+        lines.append(f"# --- HOST {h.name} ({h.lan}) ---\n")
+        lines.append(f"echo \"Configurazione nodo {h.name}\"\n")
+        lines.append(
+            f"VBoxManage guestcontrol {h.name} run --username root --password root "
+            f"--wait-stdout --exe /usr/bin/hostname -- {h.name}\n"
+        )
+        lines.append(
+            f"VBoxManage guestcontrol {h.name} run --username root --password root "
+            f"--wait-stdout --exe /sbin/ip -- addr add {h.ip}/{h.prefix} dev enp0s3\n"
+        )
+        lines.append(
+            f"VBoxManage guestcontrol {h.name} run --username root --password root "
+            f"--wait-stdout --exe /sbin/ip -- route add default via {h.gw}\n\n"
+        )
+
+    # ROUTER
+    for r in routers:
+        lines.append(f"# --- ROUTER {r.name} ---\n")
+        lines.append(f"echo \"Configurazione router {r.name}\"\n")
+        lines.append(
+            f"VBoxManage guestcontrol {r.name} run --username root --password root "
+            f"--wait-stdout --exe /usr/bin/hostname -- {r.name}\n"
+        )
+
+        # link set up
+        # ip addr add
+        for iface in r.interfaces:
+            # porto su le interfacce non primarie (in molti setup, enp0s3 è già up; qui le attivo tutte)
+            lines.append(
+                f"VBoxManage guestcontrol {r.name} run --username root --password root "
+                f"--wait-stdout --exe /sbin/ip -- link set {iface.linux_if} up\n"
+            )
+        for iface in r.interfaces:
+            lines.append(
+                f"VBoxManage guestcontrol {r.name} run --username root --password root "
+                f"--wait-stdout --exe /sbin/ip -- addr add {iface.ip}/{iface.prefix} dev {iface.linux_if}\n"
+            )
+
+        # ip_forward
+        if r.enable_forwarding:
+            lines.append(
+                f"VBoxManage guestcontrol {r.name} run --username root --password root "
+                f"--wait-stdout --exe /usr/sbin/sysctl -- -w net.ipv4.ip_forward=1\n"
+            )
+
+        # rotte statiche
+        for route in r.routes:
+            lines.append(
+                f"VBoxManage guestcontrol {r.name} run --username root --password root "
+                f"--wait-stdout --exe /sbin/ip -- route add {route.dest} via {route.via}\n"
+            )
+
+        lines.append("\n")
+
+    # ISP (se gestito come nodo speciale)
+    if isp_name:
+        lines.append(f"# --- ISP ({isp_name}) ---\n")
+        lines.append(f"echo \"Configurazione ISP ({isp_name})\"\n")
+        lines.append(
+            f"VBoxManage guestcontrol {isp_name} run --username root --password root "
+            f"--wait-stdout --exe /usr/bin/hostname -- {isp_name}\n"
+        )
+        # Interfacce ISP
+        for iface in isp_ifaces:
+            linux_if = iface["linux_if"]
+            ip = iface["ip"]
+            prefix = iface["prefix"]
+            lines.append(
+                f"VBoxManage guestcontrol {isp_name} run --username root --password root "
+                f"--wait-stdout --exe /sbin/ip -- link set {linux_if} up\n"
+            )
+            lines.append(
+                f"VBoxManage guestcontrol {isp_name} run --username root --password root "
+                f"--wait-stdout --exe /sbin/ip -- addr add {ip}/{prefix} dev {linux_if}\n"
+            )
+        lines.append(
+            f"VBoxManage guestcontrol {isp_name} run --username root --password root "
+            f"--wait-stdout --exe /usr/sbin/sysctl -- -w net.ipv4.ip_forward=1\n\n"
+        )
+
+    return "".join(lines)
+
+def main():
+    print(textwrap.dedent("""
+        ===============================
+        Generatore _gn.sh e _conf.sh
+        ===============================
+
+        Questo script ti permette di:
+        - aggiungere host
+        - aggiungere router
+        - (opzionale) definire un ISP
+        - generare automaticamente i file:
+        <prefisso>_gn.sh  e  <prefisso>_conf.sh
+    """))
+
+    base_vm = input("Nome VM base (es. debbie2022): ").strip() or "debbie2022"
+    file_prefix = input("Prefisso file (es. Esercizio2): ").strip() or "topologia"
+
+    hosts = []
+    routers = []
+    isp_name = ""
+    isp_ifaces = []
+
+    while True:
+        print("\n=== MENU PRINCIPALE ===")
+        print("1) Aggiungi host")
+        print("2) Aggiungi router")
+        print("3) Definisci/Modifica ISP")
+        print("4) Genera file ed esci")
+        print("5) Esci senza generare")
+        choice = input("Scelta: ").strip()
+
+        if choice == "1":
+            hosts.append(add_host())
+        elif choice == "2":
+            routers.append(add_router())
+        elif choice == "3":
+            isp_name = input("Nome VM ISP (lascia vuoto per nessun ISP): ").strip()
+            isp_ifaces = []
+            if isp_name:
+                while True:
+                    print(f"\n--- Aggiungi interfaccia per ISP ({isp_name}) ---")
+                    linux_if = input("Nome interfaccia Linux (es. enp0s3): ").strip()
+                    ip = input("IP interfaccia (es. 10.0.0.1): ").strip()
+                    prefix = input_int("Prefisso (es. 30): ")
+                    isp_ifaces.append({
+                        "linux_if": linux_if,
+                        "ip": ip,
+                        "prefix": prefix
+                    })
+                    more = input("Aggiungere un'altra interfaccia ISP? [s/N]: ").strip().lower()
+                    if more != "s":
+                        break
+        elif choice == "4":
+            # genera file
+            gn_content = build_gn_script(base_vm, hosts, routers, isp_name, file_prefix)
+            conf_content = build_conf_script(hosts, routers, isp_name, isp_ifaces)
+
+            gn_name = f"{file_prefix}_gn.sh"
+            conf_name = f"{file_prefix}_conf.sh"
+
+            with open(gn_name, "w") as f:
+                f.write(gn_content)
+            with open(conf_name, "w") as f:
+                f.write(conf_content)
+
+            # rende eseguibili
+            os.chmod(gn_name, 0o755)
+            os.chmod(conf_name, 0o755)
+
+            print(f"\nFile generati: {gn_name} e {conf_name}")
+            print("Ricontrolla eventuali IP/rotte e interfacce Linux prima di usarli.")
+            break
+        elif choice == "5":
+            print("Uscita senza generare file.")
+            break
+        else:
+            print("Scelta non valida.")
+
+if __name__ == "__main__":
+    main()
+    
