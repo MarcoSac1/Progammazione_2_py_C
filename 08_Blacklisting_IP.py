@@ -103,10 +103,10 @@ while coda:
     ip = pacchetto["ip_sorgente"]
 
     if albero.cerca(ipToInt(ip)):
-        print(ip, "-> BLOCCATO")
+        print(ip, "-> Bloccato")
         bloccati += 1
     else:
-        print(ip, "-> PERMESSO")
+        print(ip, "-> Permesso")
         permessi += 1
 
 # 6) riepilogo finale
